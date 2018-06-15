@@ -1,0 +1,520 @@
+---
+title: Is the acquisition of a habit-like knowledge associated with general cognitice
+  performance?
+author: "Horváth Kata"
+date: '2018 június 15 '
+output: 
+  html_document: 
+    theme: cosmo
+    highlight: monochrome
+    toc: TRUE
+    toc_float: FALSE
+    toc_depth: 4
+    number_sections: TRUE
+    code_folding: hide
+    df_print: kable
+---
+
+## Abstract
+
+It is now accapted that implicit learning, including the recognition of statistical patterns, is not correlated with general cognitive performance, such as working memory. However, it is still an open question, whether the long-term acqusition without further learning is still independent of these higher-order human abilities. In the present study, a prolonged version of the Alternating Serial Reaction Time (ASRT) task was used to induce habit learning. In an average study focusing on learning, 20-30 blocks of the task is used, in contrast here 45 blocks were administered to be able to measure learning and acquisition separately. Our first question was that when do participants reach the limit of learning and from wich time point no further improvment can be observed. In the ASRT task high frequency and predictability elements are alternating with low frequency and probability trials. Learning performance is defined by the difference of these two measures. We hypothesize that similarly to learning performance, habit formation is not correlated with general cognitive perfoamrance. To gain deeper insight into the question, attention and executive functions were also measured besides working memory capacity. 31 healthy young adults participated in the experiment. First, we explored the data,  then general ASRT analyses were conducted to clearly reveal the offset of learning. Finnaly, exploratory correlational analyses were run in order to fully investigate our question. 
+
+*Note: data is from one of my preveious experiments focusing on the rewiring of habits. The experiment consisted of 3 ASRT sessions, here on the first one is investigated.*
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+## Analysis
+
+### Importing libraries and loading the data
+```{r, loading packages, message = FALSE, echo = TRUE}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(readxl)
+library(ggpubr)
+library(tidyr)
+library(corrplot)
+library(plotrix)
+gsrt_raw <- read_excel("gsrt_data_by_block.xlsx")
+```
+### Count the number of participants, observations, search for missing data
+```{r , message = FALSE, echo = TRUE}
+N_participants <- gsrt_raw %>% 
+  group_by(ID) %>% 
+  count(ID)
+N_blocks <- gsrt_raw %>% 
+  group_by(block) %>% 
+  count(block)
+N_epochs <- gsrt_raw %>% 
+  group_by(epoch) %>% 
+  count(epoch)
+
+NA_neuropsy <- gsrt_raw %>% 
+  select(digit_span, counting_span, wcst_pers_error_rate, ant_alerting, ant_orienting, 
+         ant_executive, gng_dprime, gng_false_alarm_rate, running_span) %>% 
+  summarise_all(funs(sum(is.na(.))))
+
+NA_neuropsy_row <- gsrt_raw %>% 
+  filter(block == 1) %>% 
+  select(ID, digit_span, counting_span, wcst_pers_error_rate, ant_alerting, ant_orienting, 
+         ant_executive, gng_dprime, gng_false_alarm_rate, running_span)
+
+apply(NA_neuropsy_row, MARGIN = 1, function(x) sum(is.na(x)))  
+
+gsrt_30 <- gsrt_raw %>% 
+  filter(ID != "ID_104")
+
+```
+The sample consists 31 participants and the experiment consisted of 45 blocks equaling 9 epochs. The ASRT task has two main variables: performance on high frequency trials and performance on low frequncy trials. Here we focused on these two.
+One of the participants (ID_104) did not have more than the half of the neuropsychological data, so he/she was excluded from further analyses.
+
+To gain insight into the general cognitive performance of the sample, means and standard deviation were calculated for every neuropsychological measurements.
+We used the following tasks and measurements:
+    *Digit span*
+    *Counting span*
+    *Running span* - percent of correctly solved trials with 6 elements to remember
+    *Wisconsin Card sorting task* - percentage of perseverative errors
+    *Go/No-go task* - dprime (sensitivity index), percentage of false alarms
+    *Attention network test* - three independent attentional functions: alerting, orienting,                                         executive measured in RTs
+    
+```{r, means, message = TRUE, echo = TRUE}
+digit_span <- NA_neuropsy_row %>% 
+  summarize(mean_ds = mean(digit_span),
+            sd_ds = sd(digit_span),
+            min_ds = min(digit_span),
+            max_ds = max(digit_span))
+counting_span <- NA_neuropsy_row %>% 
+  summarize(mean_cs = mean(counting_span),
+            sd_cs = sd(counting_span),
+            min_cs = min(counting_span),
+            max_cs = max(counting_span))
+ANT <- NA_neuropsy_row %>% 
+  drop_na() %>% 
+  summarize(mean_o = mean(ant_orienting),
+            sd_o = sd(ant_orienting),
+            min_o = min(ant_orienting),
+            max_o = max(ant_orienting),
+            mean_a = mean(ant_alerting),
+            sd_a = sd(ant_alerting),
+            min_a = min(ant_alerting),
+            max_a = max(ant_alerting),
+            mean_e = mean(ant_executive),
+            sd_e = sd(ant_executive),
+            min_e = min(ant_executive),
+            max_e = max(ant_executive))
+go_no_go <- NA_neuropsy_row %>% 
+  drop_na() %>% 
+  summarize(mean_dp = mean(gng_dprime),
+            sd_dp = sd(gng_dprime),
+            min_dp = min(gng_dprime),
+            max_dp = max(gng_dprime),
+            mean_fa = mean(gng_false_alarm_rate),
+            sd_fa = sd(gng_false_alarm_rate),
+            min_fa = min(gng_false_alarm_rate),
+            max_fa = max(gng_false_alarm_rate))
+running_span <- NA_neuropsy_row %>% 
+  drop_na() %>% 
+  summarize(mean_rs = mean(running_span),
+            sd_rs = sd(running_span),
+            min_rs = min(running_span),
+            max_rs = max(running_span))
+WCST <- NA_neuropsy_row %>% 
+  drop_na() %>% 
+  summarize(mean_pe = mean(wcst_pers_error_rate),
+            sd_pe = sd(wcst_pers_error_rate),
+            min_pe = min(wcst_pers_error_rate),
+            max_pe = max(wcst_pers_error_rate))
+
+digit_span
+counting_span
+running_span
+ANT
+WCST
+go_no_go
+```
+### Exploring outlier performance on the ASRT task
+
+Both statistical measurements, boxplots and line charts were used here to visualize outlier performance in different way. This step was considered because dropping out subject from the sample based on their performance is always risky.
+One particiant was excluded dut to too fast RTs.
+```{r, message = FALSE, echo = FALSE, fig.height = 3, fig.width = 6, fig.align = "center"}
+is_outlier <- function(x) {
+  return(x < quantile(x, 0.25) - 1.5 * IQR(x) | x > quantile(x, 0.75) + 1.5 * IQR(x))}
+
+gsrt_30 <- gsrt_30 %>%
+  group_by(epoch) %>% 
+  mutate(outlier_H_rt = ifelse(is_outlier(H_rt), ID,"")) %>% 
+  mutate(outlier_L_rt = ifelse(is_outlier(L_rt), ID,"")) %>% 
+  mutate(outlier_H_acc = ifelse(is_outlier(H_acc), ID,"")) %>% 
+  mutate(outlier_L_acc = ifelse(is_outlier(L_acc), ID,""))
+
+ggplot(gsrt_30, aes(y = H_rt, x = factor(epoch))) +
+  geom_boxplot(notch = TRUE)+
+  labs(y = "RTs for high frequency-high probability elements", x = "Epochs",
+       title = "Outlier exploration I.") +
+  coord_cartesian(ylim = c(200, 480), xlim = c(0, 10)) +
+  geom_text(aes(label = outlier_H_rt, hjust = -0.3), size = 2.3)
+  
+ggplot(gsrt_30, aes(y = L_rt, x = factor(epoch))) +
+  geom_boxplot(notch = TRUE)+
+  labs(y = "RTs for low frequency-low probability elements", x = "Epochs",
+       title = "Outlier exploration II.") +
+  coord_cartesian(ylim = c(220, 500), xlim = c(0, 10)) +
+  geom_text(aes(label = outlier_L_rt, hjust = -0.3), size = 2.3)
+
+
+ggplot(gsrt_30, aes(y = H_acc, x = factor(epoch))) +
+  geom_boxplot(notch = TRUE)+
+  labs(y = "Accuracy on high frequency-high probability elements", x = "Epochs",
+       title = "Outlier exploration III.") +
+  coord_cartesian(ylim = c(0.6, 1), xlim = c(0, 10)) +
+  geom_text(aes(label = outlier_H_acc, hjust = -0.3), size = 2.3)
+
+ggplot(gsrt_30, aes(y = L_acc, x = factor(epoch))) +
+  geom_boxplot(notch = TRUE)+
+  labs(y = "Accuracy on low frequency-low probability elements", x = "Epochs",
+       title = "Outlier exploration IV.") +
+  coord_cartesian(ylim = c(0.5, 1), xlim = c(0, 10)) +
+  geom_text(aes(label = outlier_L_acc, hjust = -0.3), size = 2.3)
+
+
+ggplot(gsrt_30, aes(y = H_rt, x = block, color = ID)) +
+  geom_path() +
+  labs(y = "Reaction time (ms)", x = "Blocks") +
+  coord_cartesian(ylim = c(200, 500))
+
+ggplot(gsrt_30, aes(y = L_rt, x = block, color = ID)) +
+  geom_path() +
+  labs(y = "Reaction time (ms)", x = "Blocks") +
+  coord_cartesian(ylim = c(200, 500))  
+
+ggplot(gsrt_30, aes(y = H_acc, x = block, color = ID)) +
+  geom_path() +
+  labs(y = "Accuracy", x = "Blocks")
+
+ggplot(gsrt_30, aes(y = L_acc, x = block, color = ID)) +
+  geom_path() +
+  labs(y = "Accuracy", x = "Blocks")
+
+gsrt_29 <- gsrt_30 %>% 
+  filter(ID != "ID_106")
+```
+Before conducting the ANOVA, assumption check is needed. Both statistical analaysis (Shapiro-Wilk test for normality) and data visualization were used.
+
+```{r, message = FALSE, echo = TRUE, fig.height = 1.5, fig.width = 1.5, fig.align = "center"}
+
+gsrt_anova <- gsrt_29 %>%
+  mutate(LH_dif_rt = L_rt - H_rt) %>% 
+  mutate(HL_dif_acc = H_acc - L_acc)
+
+shapiro.test(gsrt_anova$LH_dif_rt)
+shapiro.test(gsrt_anova$HL_dif_acc)
+ggqqplot(gsrt_anova$LH_dif_rt)
+ggqqplot(gsrt_anova$HL_dif_acc)
+
+ggplot(gsrt_anova, aes(x = LH_dif_rt))+
+  geom_density()
+ggplot(gsrt_anova, aes(x = HL_dif_acc))+
+  geom_density()
+```
+
+## Main results I.
+
+### Investigating learning performance and habit formation represented in reaction time performance and accuracy.
+Although based ont eh Shapiro-Wilk test, normality was violated, the plots revealed that violation was not extreme, that is a repeted measures ANOVA is accurate for the dataset.
+After assumption checking, a repeated measures ANOVA was conducted on the learning scores of RTs and accuracy, separately with the within-subject factor TIME.
+The ANOVA revelaed significant effect of time in both cases:
+
+Reaction time: *F*(1, 28) = 36.27, *p* < 0.0001
+Accuracy: *F*(1, 28) = 24.52, *p* < 0.0001
+
+After, the offset of learning and the onset of habit acqusition **without** further learning was defined by pair-wise comparisons of each epochs. Holm-Bonferroni correction was used to correct for type I. error.
+
+Results showed that in the case of reaction times, no further improvement can be observed after the 4th epoch, however in the case of accuracy, the story is not that clear. It can be explained by the strong effect of fatigue on accuracy and the fact, that this is a less sensitive measurement of the task than RTs. For further correlational analyses, only reaction time data is used and data is splitted into learning phase (epoch 1-4) and habit phase (epoch 5-9).
+```{r, cconducting the anova and pairwise comparisons, message = FALSE, echo = TRUE, fig.height = 8, fig.width = 14, fig.align = "center"}
+
+gsrt_anova$ID <- as.factor(gsrt_anova$ID)
+
+anova_time_rt <- aov(LH_dif_rt ~ epoch + Error(ID/epoch), data=gsrt_anova)
+summary(anova_time_rt)
+
+anova_time_acc <- aov(HL_dif_acc ~ epoch + Error(ID/epoch), data=gsrt_anova)
+summary(anova_time_acc)
+
+pairwise.t.test(gsrt_anova$LH_dif_rt, gsrt_anova$epoch, p.adj = "holm")
+pairwise.t.test(gsrt_anova$HL_dif_acc, gsrt_anova$epoch, p.adj = "holm")
+
+gsrt_plot <- gsrt_anova %>% 
+  group_by(epoch) %>% 
+  mutate(avg_h_rt = mean(H_rt)) %>% 
+  mutate(avg_l_rt = mean(L_rt)) %>% 
+  mutate(avg_h_acc = mean(H_acc)) %>% 
+  mutate(avg_l_acc = mean(L_acc)) %>% 
+  mutate(std_error_h_rt = std.error(H_rt, na.rm)) %>% 
+  mutate(std_error_l_rt = std.error(L_rt, na.rm)) %>% 
+  mutate(std_error_h_acc = std.error(H_acc, na.rm)) %>% 
+  mutate(std_error_l_acc = std.error(L_acc, na.rm)) %>% 
+  ungroup()
+
+ggplot(gsrt_plot)+
+  geom_point(mapping = (aes(y = gsrt_plot$avg_h_rt, x = factor(epoch),
+                            color = "High frequency &
+  probability trials")), size = 3) +
+  geom_point(mapping = (aes(y = gsrt_plot$avg_l_rt, x = factor(epoch),
+                            color = "Low frequency &
+  probability trials")), size = 3) +
+  geom_line(mapping = aes(x = epoch, y = gsrt_plot$avg_h_rt,
+                          color = "High frequency &
+  probability trials"), size = 1.5) +
+  geom_line(mapping = aes(x = epoch, y = gsrt_plot$avg_l_rt,
+                          color = "Low frequency &
+  probability trials"), size = 1.5) +
+  geom_errorbar(aes(x = factor(epoch), ymin = gsrt_plot$avg_h_rt - gsrt_plot$std_error_h_rt, 
+                    ymax = gsrt_plot$avg_h_rt + gsrt_plot$std_error_h_rt),
+                position = "dodge", width = 0.4, color = "grey60") +
+  geom_errorbar(aes(x = factor(epoch), ymin = gsrt_plot$avg_l_rt - gsrt_plot$std_error_l_rt,
+                    ymax = gsrt_plot$avg_l_rt + gsrt_plot$std_error_l_rt),
+                position = "dodge", width = 0.4, color = "grey60") +
+  labs(y = "Difference score of high and
+  low frequency&probability trials (ms)",
+       x = "Epochs", title = "Habit learning & acquisition", caption = "Error bars represent the standard error of means") +
+  theme_minimal() +
+  theme(plot.background = element_rect(fill = "white"),
+        plot.title = element_text(color = "grey5", size = 18),
+        text = element_text(color = "grey25", size = 14)) +
+  coord_cartesian(ylim = c(275, 375))
+ggsave("reaction_time.jpg")
+
+ggplot(gsrt_plot)+
+  geom_point(mapping = (aes(y = gsrt_plot$avg_h_acc, x = factor(epoch),
+                            color = "High frequency &
+  probability trials")), size = 3) +
+  geom_point(mapping = (aes(y = gsrt_plot$avg_l_acc, x = factor(epoch),
+                            color = "Low frequency &
+  probability trials")), size = 3) +
+  geom_line(mapping = aes(x = epoch, y = gsrt_plot$avg_h_acc,
+                          color = "High frequency &
+  probability trials"), size = 1.5) +
+  geom_line(mapping = aes(x = epoch, y = gsrt_plot$avg_l_acc,
+                          color = "Low frequency &
+  probability trials"), size = 1.5) +
+  geom_errorbar(aes(x = factor(epoch), ymin = gsrt_plot$avg_h_acc - gsrt_plot$std_error_h_acc, 
+                    ymax = gsrt_plot$avg_h_acc + gsrt_plot$std_error_h_acc),
+                position = "dodge", width = 0.4, color = "grey60") +
+  geom_errorbar(aes(x = factor(epoch), ymin = gsrt_plot$avg_l_acc - gsrt_plot$std_error_l_acc,
+                    ymax = gsrt_plot$avg_l_acc + gsrt_plot$std_error_l_acc),
+                position = "dodge", width = 0.4, color = "grey60") +
+  labs(y = "Difference score of high and
+  low frequency&probability trials (accuracy)",
+       x = "Epochs", title = "Habit learning & acquisition", caption = "Error bars represent the stadard error of mean") +
+  theme_minimal() +
+  theme(plot.background = element_rect(fill = "white"),
+        plot.title = element_text(color = "grey5", size = 20),
+        text = element_text(color = "grey25", size = 14)) +
+  coord_cartesian(ylim = c(0.85, 1))
+ggsave("accuracy.jpg", width = 10, height = 7)
+```
+## Main results II.
+
+### Correlational plots
+
+Before the exact statistical analyses was conducted, association of learning/habit perfomance and general cognitive perfromance including general RTs, ACCs and several neuropsychological tests was observed by data visualization.
+```{r, message = FALSE, echo = TRUE, fig.height = 5, fig.width = 6, fig.align = "center"}
+
+gsrt_corr_learning <- gsrt_plot %>% 
+  filter(block == 1 | block == 6 | block == 11 | 
+         block == 16 | block == 21 | block == 26 |
+         block == 31 | block == 36 | block == 41) %>% 
+  filter(epoch <= 4) %>% 
+  drop_na()
+
+gsrt_corr_habit <- gsrt_plot %>% 
+  filter(block == 1 | block == 6 | block == 11 | 
+           block == 16 | block == 21 | block == 26 |
+           block == 31 | block == 36 | block == 41) %>% 
+  filter(epoch > 4) %>% 
+  drop_na()
+
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = digit_span, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = digit_span, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Verbal short term memory", x = "learning performance")
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = counting_span, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = counting_span, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Central executive", x = "learning performance")
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = running_span, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = running_span, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Updating", x = "learning performance")
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = ant_orienting, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = ant_orienting, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Orienting attention", x = "learning performance")
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = ant_alerting, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = ant_alerting, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Alertingattention", x = "learning performance")
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = ant_executive, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = ant_executive, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Executive attention", x = "learning performance")
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = wcst_pers_error_rate, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = wcst_pers_error_rate, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Shifting", x = "learning performance")
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = gng_dprime, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = gng_dprime, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Sensitivity", x = "learning performance")
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = gng_false_alarm_rate, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = gng_false_alarm_rate, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Inhibition", x = "learning performance")
+
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = avg_rt, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = avg_rt, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "accuracy", x = "learning performance")
+ggplot(gsrt_corr_learning) +
+  geom_smooth(method = lm, mapping = aes(y = avg_acc, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = avg_acc, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "reaction time", x = "learning performance")
+
+
+gsrt_corr_habit <- gsrt_plot %>% 
+  filter(block == 1 | block == 6 | block == 11 | 
+           block == 16 | block == 21 | block == 26 |
+           block == 31 | block == 36 | block == 41) %>% 
+  filter(epoch > 4) %>% 
+  drop_na()
+
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = digit_span, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = digit_span, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Verbal short term memory", x = "habit acquisition performance")
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = counting_span, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = counting_span, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Central executive", x = "habit acquisition performance")
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = running_span, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = running_span, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Updating", x = "habit acquisition performance")
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = ant_orienting, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = ant_orienting, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Orienting attention", x = "habit acquisition performance")
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = ant_alerting, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = ant_alerting, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Alertingattention", x = "habit acquisition performance")
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = ant_executive, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = ant_executive, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Executive attention", x = "habit acquisition performance")
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = wcst_pers_error_rate, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = wcst_pers_error_rate, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Shifting", x = "habit acquisition performance")
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = gng_dprime, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = gng_dprime, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Sensitivity", x = "habit acquisition performance")
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = gng_false_alarm_rate, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = gng_false_alarm_rate, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "Inhibition", x = "habit acquisition performance")
+
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = avg_rt, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = avg_rt, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "accuracy", x = "habit acquisition performance")
+ggplot(gsrt_corr_habit) +
+  geom_smooth(method = lm, mapping = aes(y = avg_acc, x = LH_dif_rt)) +
+  geom_point(mapping = aes(y = avg_acc, x = LH_dif_rt, color = factor(epoch))) +
+  labs(y = "reaction time", x = "habit acquisition performance")
+
+```
+
+### Correlational analysis
+
+Spearman correlations were conducted due to normalality violation and the lack of expectations for truly linear relationships.
+We found no significant and at least moderately strong correlation. 
+
+```{r, message = TRUE, echo = TRUE}
+gsrt_corr_learning <- gsrt_plot %>% 
+  filter(block == 1 | block == 6 | block == 11 | 
+         block == 16 | block == 21 | block == 26 |
+         block == 31 | block == 36 | block == 41) %>% 
+  filter(epoch <= 4) %>% 
+  drop_na()
+
+gsrt_corr_habit <- gsrt_plot %>% 
+  filter(block == 1 | block == 6 | block == 11 | 
+           block == 16 | block == 21 | block == 26 |
+           block == 31 | block == 36 | block == 41) %>% 
+  filter(epoch > 4) %>% 
+  drop_na()
+
+shapiro.test(gsrt_anova$digit_span)
+shapiro.test(gsrt_anova$counting_span)
+shapiro.test(gsrt_anova$running_span)
+shapiro.test(gsrt_anova$wcst_pers_error_rate)
+shapiro.test(gsrt_anova$ant_orienting)
+shapiro.test(gsrt_anova$ant_alerting)
+shapiro.test(gsrt_anova$ant_executive)
+shapiro.test(gsrt_anova$gng_dprime)
+shapiro.test(gsrt_anova$gng_false_alarm_rate)
+shapiro.test(gsrt_anova$avg_rt)
+shapiro.test(gsrt_anova$avg_acc)
+
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$digit_span,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$counting_span,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$running_span,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$ant_orienting,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$ant_alerting,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$ant_executive,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$wcst_pers_error_rate,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$gng_dprime,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$gng_false_alarm_rate,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$avg_rt,
+         method = "spearman")
+cor.test(gsrt_corr_learning$LH_dif_rt, gsrt_corr_learning$avg_acc,
+         method = "spearman")
+
+
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$digit_span,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$counting_span,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$running_span,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$ant_orienting,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$ant_alerting,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$ant_executive,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$wcst_pers_error_rate,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$gng_dprime,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$gng_false_alarm_rate,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$avg_rt,
+         method = "spearman")
+cor.test(gsrt_corr_habit$LH_dif_rt, gsrt_corr_habit$avg_acc,
+         method = "spearman")
+```
+## Conclusions
+
+Our results are in line with our hypothesis, that similarly to the learning of the knowledge behind a habit-like behavior, the acqusition of the habit itself is not associated with general cogntive performance, suggesting that the extraction of statistical patterns and building automatic responses based on these patterns takes place at another level then higher-order human abilities in our processing system.
